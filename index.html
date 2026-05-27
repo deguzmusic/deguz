@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>.</title>
+<meta name="robots" content="noindex">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap');
+
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+  :root {
+    --bg:       #08000F;
+    --purple:   #2A0050;
+    --glow-col: rgba(100, 0, 180, 0.15);
+    --bright:   #9B30FF;
+    --dim:      rgba(220, 190, 255, 0.28);
+    --ghost:    rgba(220, 190, 255, 0.07);
+    --text:     rgba(235, 215, 255, 0.88);
+  }
+
+  html, body {
+    width:100%; height:100%;
+    background: var(--bg);
+    overflow: hidden;
+    font-family: 'Space Mono', monospace;
+    cursor: none;
+  }
+
+  /* grain */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity:0.04; pointer-events:none; z-index:100;
+  }
+
+  /* vignette */
+  body::after {
+    content:'';
+    position:fixed; inset:0;
+    background: radial-gradient(ellipse at 50% 50%, transparent 20%, rgba(0,0,0,0.82) 100%);
+    pointer-events:none; z-index:99;
+  }
+
+  /* scanlines */
+  .scanlines {
+    position:fixed; inset:0;
+    background: repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.04) 3px,rgba(0,0,0,0.04) 4px);
+    pointer-events:none; z-index:98;
+  }
+
+  /* square cursor */
+  .cursor {
+    position:fixed; width:5px; height:5px;
+    background: var(--dim);
+    pointer-events:none; z-index:9999;
+    transform:translate(-50%,-50%);
+  }
+
+  /* ── CENTRE STAGE ── */
+  .stage {
+    position:fixed; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    z-index:10;
+  }
+
+  /* ambient glow behind button */
+  .glow {
+    position:absolute;
+    width:55vw; height:55vw;
+    max-width:420px; max-height:420px;
+    border-radius:50%;
+    background: radial-gradient(circle, var(--glow-col) 0%, transparent 70%);
+    animation: breathe 6s ease-in-out infinite;
+    pointer-events:none;
+  }
+
+  @keyframes breathe {
+    0%,100% { transform:scale(1);   opacity:0.5; }
+    50%      { transform:scale(1.2); opacity:1;   }
+  }
+
+  /* ── PULSING PLAY BUTTON — dead centre ── */
+  .play-btn {
+    position:relative;
+    width:72px; height:72px;
+    border:1px solid var(--dim);
+    background: transparent;
+    cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    z-index:20;
+    transition: border-color 0.4s;
+    flex-shrink:0;
+  }
+
+  .play-btn:hover { border-color: var(--bright); }
+
+  /* idle pulse rings */
+  .play-btn::before,
+  .play-btn::after {
+    content:'';
+    position:absolute;
+    border:1px solid var(--dim);
+    border-radius:0;
+    animation: pulse-ring 3s ease-out infinite;
+  }
+  .play-btn::before { inset:-14px; animation-delay:0s;    }
+  .play-btn::after  { inset:-28px; animation-delay:1.2s;  }
+
+  @keyframes pulse-ring {
+    0%   { opacity:0.5; transform:scale(1);    }
+    100% { opacity:0;   transform:scale(1.18); }
+  }
+
+  /* stop pulse when playing, show corner brackets instead */
+  .play-btn.playing::before,
+  .play-btn.playing::after {
+    animation: none;
+    border-color: var(--bright);
+    opacity:0.6;
+  }
+
+  .play-btn svg {
+    width:20px; height:20px;
+    fill: var(--text);
+    margin-left:4px;
+  }
+
+  .pause-bars {
+    display:none;
+    gap:6px; align-items:center; justify-content:center;
+  }
+  .pause-bars span {
+    width:4px; height:18px;
+    background: var(--text);
+  }
+
+  .play-btn.playing svg        { display:none; }
+  .play-btn.playing .pause-bars { display:flex; }
+
+  /* waveform — below button */
+  .waveform {
+    display:flex; align-items:center; gap:3px;
+    height:24px; margin-top:1.6rem;
+    opacity:0; transition: opacity 0.6s ease;
+    flex-shrink:0;
+  }
+  .waveform.active { opacity:1; }
+
+  .bar {
+    width:2px; height:2px;
+    background: var(--bright);
+  }
+  .waveform.active .bar {
+    animation: wave var(--dur) ease-in-out infinite alternate;
+    animation-delay: var(--delay);
+  }
+  @keyframes wave {
+    from { height:2px; opacity:0.3; }
+    to   { height:var(--h); opacity:1; }
+  }
+
+  /* label below waveform */
+  .player-label {
+    margin-top:1rem;
+    font-size:0.5rem;
+    letter-spacing:0.35em;
+    text-transform:uppercase;
+    color: var(--dim);
+    text-align:center;
+    flex-shrink:0;
+  }
+
+  /* ── UNGRADED TEXT — hidden until song ends ── */
+  .end-text {
+    position:fixed; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    pointer-events:none;
+    opacity:0;
+    z-index:30;
+    transition: opacity 3s ease;
+  }
+
+  .end-text.visible { opacity:1; }
+
+  .end-word {
+    font-family:'Bebas Neue','Impact',sans-serif;
+    font-size: clamp(4rem,17vw,12rem);
+    font-weight:400;
+    letter-spacing:0.07em;
+    color: var(--text);
+    line-height:0.9;
+    text-align:center;
+  }
+
+  .end-period { color: var(--bright); }
+
+  .end-sub {
+    margin-top:1.5rem;
+    font-size:clamp(0.5rem,1.6vw,0.7rem);
+    letter-spacing:0.45em;
+    text-transform:uppercase;
+    color: var(--dim);
+  }
+
+  .end-divider {
+    width:0;
+    height:1px;
+    background: linear-gradient(90deg,transparent,var(--dim),transparent);
+    margin:1.2rem auto;
+    transition: width 2s ease 1s;
+  }
+  .end-text.visible .end-divider { width: clamp(60px,18vw,160px); }
+
+  /* spotify ghost */
+  .spotify-link {
+    position:fixed;
+    bottom:clamp(0.8rem,3vh,1.2rem);
+    right:clamp(1rem,4vw,1.5rem);
+    font-size:0.48rem;
+    letter-spacing:0.2em;
+    text-transform:uppercase;
+    color: var(--ghost);
+    text-decoration:none;
+    opacity:0;
+    animation: fadeup 2s ease forwards;
+    animation-delay:5s;
+    transition: color 0.4s;
+    z-index:20;
+  }
+  .spotify-link:hover { color: var(--dim); }
+
+  /* particles */
+  .particles { position:fixed; inset:0; pointer-events:none; z-index:2; overflow:hidden; }
+  .particle {
+    position:absolute; width:1px; height:1px;
+    background: var(--bright); opacity:0;
+    animation: pfloat var(--dur) ease-in-out infinite;
+    animation-delay: var(--delay);
+    left:var(--x); top:var(--y);
+  }
+  @keyframes pfloat {
+    0%   { transform:translateY(0);    opacity:0;   }
+    15%  { opacity:0.5; }
+    85%  { opacity:0.15; }
+    100% { transform:translateY(-90px); opacity:0; }
+  }
+
+  @keyframes fadeup {
+    0%   { opacity:0; transform:translateY(5px); }
+    100% { opacity:1; transform:translateY(0);   }
+  }
+
+</style>
+</head>
+<body>
+
+<div class="cursor"   id="cursor"></div>
+<div class="scanlines"></div>
+<div class="particles" id="particles"></div>
+
+<div class="stage">
+  <div class="glow"></div>
+
+  <button class="play-btn" id="playBtn" aria-label="Play ungraded.">
+    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    <div class="pause-bars"><span></span><span></span></div>
+  </button>
+
+  <div class="waveform" id="waveform"></div>
+  <div class="player-label" id="playerLabel">listen</div>
+</div>
+
+<!-- revealed on song end -->
+<div class="end-text" id="endText">
+  <div class="end-word">ungraded<span class="end-period">.</span></div>
+  <div class="end-divider" id="endDivider"></div>
+  <div class="end-sub">deGuz</div>
+</div>
+
+<a class="spotify-link"
+   href="https://open.spotify.com/track/1Y6N7VJomCsKqkx5WMCvmK"
+   target="_blank" rel="noopener">spotify ↗</a>
+
+<!-- local audio file -->
+<audio id="audio" preload="auto">
+  <source src="ungraded.m4a" type="audio/mp4">
+</audio>
+
+<script>
+  // cursor
+  const cur = document.getElementById('cursor');
+  document.addEventListener('mousemove', e => {
+    cur.style.left = e.clientX + 'px';
+    cur.style.top  = e.clientY + 'px';
+  });
+
+  // particles
+  const pc = document.getElementById('particles');
+  for (let i = 0; i < 24; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    p.style.cssText = `--dur:${10+Math.random()*14}s;--delay:${Math.random()*12}s;--x:${Math.random()*100}%;--y:${25+Math.random()*55}%;`;
+    pc.appendChild(p);
+  }
+
+  // waveform bars
+  const wv = document.getElementById('waveform');
+  [5,9,15,11,19,13,7,17,10,14,8,18,12,6,16,11,15,9,13,7,17,10].forEach((h,i) => {
+    const b = document.createElement('div');
+    b.className = 'bar';
+    b.style.cssText = `--h:${h}px;--dur:${0.5+Math.random()*0.9}s;--delay:${i*0.055}s;`;
+    wv.appendChild(b);
+  });
+
+  // player
+  const audio       = document.getElementById('audio');
+  const playBtn     = document.getElementById('playBtn');
+  const playerLabel = document.getElementById('playerLabel');
+  const endText     = document.getElementById('endText');
+  let playing = false;
+
+  function startPlay() {
+    audio.play().then(() => {
+      playing = true;
+      playBtn.classList.add('playing');
+      wv.classList.add('active');
+      playerLabel.textContent = '';
+    }).catch(() => {
+      playerLabel.textContent = 'tap again';
+    });
+  }
+
+  playBtn.addEventListener('click', () => {
+    if (!playing) {
+      startPlay();
+    } else {
+      audio.pause();
+      playing = false;
+      playBtn.classList.remove('playing');
+      wv.classList.remove('active');
+      playerLabel.textContent = 'listen';
+    }
+  });
+
+  // song ends — fade in "ungraded."
+  audio.addEventListener('ended', () => {
+    playing = false;
+    playBtn.classList.remove('playing');
+    wv.classList.remove('active');
+    playerLabel.textContent = '';
+    playBtn.style.opacity = '0';
+    playBtn.style.transition = 'opacity 2s ease';
+    wv.style.opacity = '0';
+
+    setTimeout(() => {
+      endText.classList.add('visible');
+    }, 800);
+  });
+
+  document.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+</body>
+</html>
